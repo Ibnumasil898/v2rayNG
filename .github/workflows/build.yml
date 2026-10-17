@@ -10,14 +10,14 @@ on:
       - 'AndroidLibXrayLite/**'
       - 'hev-socks5-tunnel/**'
       - 'compile-hevtun.sh'
-      - '.github/workflows/build-apk.yml'
+      - '.github/workflows/**'
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: Build ARM64 Debug APK
+    name: Build Debug APK
     runs-on: ubuntu-latest
 
     steps:
@@ -49,8 +49,7 @@ jobs:
           echo "NDK_HOME=$ANDROID_HOME/ndk/29.0.14206865" >> "$GITHUB_ENV"
 
       - name: Build libhevtun
-        run: |
-          bash compile-hevtun.sh
+        run: bash compile-hevtun.sh
 
       - name: Copy libhevtun
         run: |
@@ -62,7 +61,6 @@ jobs:
           cd AndroidLibXrayLite
           CURRENT_TAG=$(git describe --tags --abbrev=0)
           echo "CURRENT_TAG=$CURRENT_TAG" >> "$GITHUB_ENV"
-          echo "Using tag: $CURRENT_TAG"
 
       - name: Download libv2ray
         uses: robinraju/release-downloader@v1.13
@@ -77,9 +75,7 @@ jobs:
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           chmod +x gradlew
-          ./gradlew clean assembleDebug \
-            --no-daemon \
-            --stacktrace
+          ./gradlew clean assembleDebug --no-daemon --stacktrace
 
       - name: Verify APK
         run: |
