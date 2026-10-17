@@ -1,0 +1,92 @@
+name: Build v2rayNG ARM64 Debug
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - indonesia-2.2.6
+    paths:
+      - 'V2rayNG/**'
+      - 'AndroidLibXrayLite/**'
+      - 'hev-socks5-tunnel/**'
+      - 'compile-hevtun.sh'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+          cache-dependency-path: V2rayNG/**/gradle-wrapper.properties
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK and NDK
+        run: |
+          sdkmanager \
+            "platforms;android-37" \
+            "build-tools;37.0.0" \
+            "platform-tools" \
+            "ndk;29.0.14206865"
+
+          echo "NDK_HOME=$ANDROID_HOME/ndk/29.0.14206865" >> "$GITHUB_ENV"
+
+      - name: Build libhevtun
+        run: bash compile-hevtun.sh
+
+      - name: Copy libhevtun
+        run: |
+          test -d libs
+          cp -r libs "$GITHUB_WORKSPACE/V2rayNG/app/"
+
+      - name: Get AndroidLibXrayLite tag
+        run: |
+          cd AndroidLibXrayLite
+          CURRENT_TAG=$(git describe --tags --abbrev=0)
+          echo "CURRENT_TAG=$CURRENT_TAG" >> "$GITHUB_ENV"
+
+      - name: Download libv2ray
+        uses: robinraju/release-downloader@v1.13
+        with:
+          repository: 2dust/AndroidLibXrayLite
+          tag: ${{ env.CURRENT_TAG }}
+          fileName: libv2ray.aar
+          out-file-path: V2rayNG/app/libs/
+
+      - name: Build Debug APK
+        working-directory: V2rayNG
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          chmod +x gradlew
+          ./gradlew clean assembleDebug --no-daemon --stacktrace
+
+      - name: Verify APK
+        run: |
+          find V2rayNG/app/build/outputs/apk \
+            -type f -name '*.apk' -print
+          test -n "$(find V2rayNG/app/build/outputs/apk \
+            -type f -name '*.apk' -print -quit)"
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2rayNG-debug-apk
+          path: V2rayNG/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
